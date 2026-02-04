@@ -573,8 +573,24 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
         <div style={{ ...S.grid2, marginTop: 10 }}>
           {/* Left: standings by name + cups left */}
           <div style={S.panel}>
-            <div style={S.panelHeader}>Giocatori</div>
-            <div style={{ overflowX: "auto" }}>
+          <div
+            style={{
+              ...S.panelHeader,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>Giocatori</span>
+            <span style={{ ...S.chip, fontSize: 12, opacity: 0.85 }}>
+              🏆 Tornei vinti · 🥈 Finali · ⭐ Top4
+            </span>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+
               <table style={S.table}>
                 <thead>
                   <tr>
