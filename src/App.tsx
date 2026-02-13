@@ -19,6 +19,7 @@ type Tournament = {
   stage: Stage;
   rrMatches: RRMatch[];
   poMatches: POMatch[];
+  seedOverride?: ID[]; // [seed1, seed2, seed3, seed4]
   winnerId?: ID;
   createdAt: number;
 };
@@ -253,6 +254,8 @@ export default function App() {
       createdAt: Date.now(),
     };
 
+	seedOverride: undefined,
+
     setState(s => ({ ...s, tournaments: [t, ...s.tournaments] }));
     setSelectedTournamentId(t.id);
   }
@@ -279,14 +282,23 @@ export default function App() {
     });
   }
   function closeRoundRobinAndStartPlayoffs() {
-    if (!selectedTournament) return;
-    if (!canCloseRR(selectedTournament)) return;
+	if (!selectedTournament) return;
+	if (!canCloseRR(selectedTournament)) return;
 
-    const standings = calcRRStandings(state.players, selectedTournament);
-    const top4 = pickTop4(standings);
-    const po = buildPlayoffs(top4);
-    updateTournament(selectedTournament.id, { stage: "playoffs", poMatches: po });
+	const standings = calcRRStandings(state.players, selectedTournament);
+	const top4Auto = pickTop4(standings);
+
+	const ov = selectedTournament.seedOverride;
+	const useOverride = ov && ov.length === 4 && new Set(ov).size === 4;
+
+	const seeds = useOverride ? ov! : top4Auto;
+
+	if (seeds.length < 4) return; // safety
+
+	const po = buildPlayoffs(seeds);
+	updateTournament(selectedTournament.id, { stage: "playoffs", poMatches: po });
   }
+
 
   // ---- Playoffs
   function setPOWins(matchId: ID, winsA: number, winsB: number) {
@@ -317,6 +329,7 @@ export default function App() {
   const rrPending = useMemo(() => (selectedTournament ? selectedTournament.rrMatches.filter(m => !m.done) : []), [selectedTournament]);
   const nextPending = rrPending[0] ?? null;
   const quickRef = useRef<HTMLDivElement | null>(null);
+  const [showSeedOverride, setShowSeedOverride] = useState(false);
 
   function quickSet(result: "2-0" | "1-1" | "0-2") {
     if (!selectedTournament || !nextPending) return;
@@ -796,12 +809,114 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                   <div style={{ padding: 10, display: "grid", gap: 8 }}>
                     <div style={{ opacity: 0.75, fontSize: 12 }}>Tie-break: Punti → Diff → Nome.</div>
                     {selectedTournament.stage === "roundrobin" && (
-                      <button style={S.btnPrimary} onClick={closeRoundRobinAndStartPlayoffs} disabled={!canCloseRR(selectedTournament)}>
-                        Chiudi girone e genera Playoff (Top4)
-                      </button>
-                    )}
+  <>
+    <button
+      style={S.btn}
+      onClick={() => setShowSeedOverride(v => !v)}
+      disabled={!canCloseRR(selectedTournament)}
+    >
+      {showSeedOverride ? "Nascondi seeding manuale" : "Override Top4 / Seed (dopo spareggio)"}
+    </button>
+
+    {showSeedOverride && (
+      <div style={{ ...S.row, marginTop: 10 }}>
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>Seeding manuale (1–4)</div>
+        <div style={{ opacity: 0.75, fontSize: 12, marginBottom: 10 }}>
+          Default = Top4 automatico. Cambia l’ordine dopo lo spareggio (2 game) e poi genera i playoff.
+        </div>
+
+        <div style={{ display: "grid", gap: 8 }}>
+          {[0, 1, 2, 3].map((i) => {
+            const label = `Seed ${i + 1}`;
+            const current = seedCurrent[i] ?? "";
+            return (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10, alignItems: "center" }}>
+                <div style={{ fontWeight: 900 }}>{label}</div>
+                <select
+                  value={current}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const base = (selectedTournament.seedOverride && selectedTournament.seedOverride.length === 4)
+                      ? [...selectedTournament.seedOverride]
+                      : [...top4Default];
+
+                    // se base non è lunga 4 (edge), riempi con top4Default
+                    while (base.length < 4) base.push(top4Default[base.length] ?? "");
+
+                    base[i] = val;
+
+                    // elimina eventuali duplicati “a cascata” (se scegli già usato)
+                    // Manteniamo le altre selezioni ma garantiamo unicità sostituendo con candidati liberi
+                    const used = new Set<ID>();
+                    const cleaned: ID[] = [];
+                    const candidates = selectedTournament.playerIds; // puoi scegliere QUALSIASI partecipante
+
+                    for (let k = 0; k < 4; k++) {
+                      const pick = base[k];
+                      if (pick && !used.has(pick)) {
+                        used.add(pick);
+                        cleaned.push(pick);
+                      } else {
+                        // prendi il primo candidato libero
+                        const free = candidates.find(c => !used.has(c));
+                        if (free) {
+                          used.add(free);
+                          cleaned.push(free);
+                        } else {
+                          cleaned.push(base[k] || "");
+                        }
+                      }
+                    }
+
+                    updateTournament(selectedTournament.id, { seedOverride: cleaned });
+                  }}
+                  style={{ ...S.input }}
+                >
+                  {selectedTournament.playerIds.map(pid => (
+                    <option key={pid} value={pid}>
+                      {getPlayerName(state.players, pid)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+          Semifinali generate: <b>1 vs 4</b> e <b>2 vs 3</b>.
+        </div>
+
+        <button
+          style={{ ...S.btn, marginTop: 10 }}
+          onClick={() => updateTournament(selectedTournament.id, { seedOverride: undefined })}
+        >
+          Reset seeding (torna automatico)
+        </button>
+      </div>
+    )}
+
+    <button style={{ ...S.btnPrimary, marginTop: 10 }} onClick={closeRoundRobinAndStartPlayoffs} disabled={!canCloseRR(selectedTournament)}>
+      Chiudi girone e genera Playoff (Top4)
+    </button>
+  </>
+)}
+
                   </div>
                 </div>
+
+				const top4Default = useMemo(() => {
+				  if (!selectedTournament) return [];
+				  return pickTop4(calcRRStandings(state.players, selectedTournament));
+				}, [selectedTournament, state.players]);
+
+				const seedCurrent = useMemo(() => {
+				  if (!selectedTournament) return [];
+				  const ov = selectedTournament.seedOverride;
+				  if (ov && ov.length === 4 && new Set(ov).size === 4) return ov;
+				  return top4Default;
+				}, [selectedTournament, top4Default]);
+
 
                 {/* Playoffs */}
                 <div style={S.panel}>
