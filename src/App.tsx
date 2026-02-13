@@ -251,10 +251,11 @@ export default function App() {
       stage: "roundrobin",
       rrMatches: buildRRMatches(opts.playerIds),
       poMatches: [],
-      createdAt: Date.now(),
+      seedOverride: undefined,
+	  createdAt: Date.now(),
     };
 
-	seedOverride: undefined,
+	
 
     setState(s => ({ ...s, tournaments: [t, ...s.tournaments] }));
     setSelectedTournamentId(t.id);
@@ -323,6 +324,18 @@ export default function App() {
   // ---- Derived for selected tournament
   const standings = useMemo(() => (selectedTournament ? calcRRStandings(state.players, selectedTournament) : []), [state.players, selectedTournament]);
   const rrDoneCount = useMemo(() => (selectedTournament ? selectedTournament.rrMatches.filter(m => m.done).length : 0), [selectedTournament]);
+
+  const top4Default = useMemo(() => {
+    if (!selectedTournament) return [];
+    return pickTop4(calcRRStandings(state.players, selectedTournament));
+  }, [selectedTournament, state.players]);
+
+  const seedCurrent = useMemo(() => {
+	if (!selectedTournament) return [];
+	const ov = selectedTournament.seedOverride;
+	if (ov && ov.length === 4 && new Set(ov).size === 4) return ov;
+	return top4Default;
+  }, [selectedTournament, top4Default]);
 
   // ---- Quick entry
   const [quickMode, setQuickMode] = useState(true);
@@ -904,19 +917,6 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
 
                   </div>
                 </div>
-
-				const top4Default = useMemo(() => {
-				  if (!selectedTournament) return [];
-				  return pickTop4(calcRRStandings(state.players, selectedTournament));
-				}, [selectedTournament, state.players]);
-
-				const seedCurrent = useMemo(() => {
-				  if (!selectedTournament) return [];
-				  const ov = selectedTournament.seedOverride;
-				  if (ov && ov.length === 4 && new Set(ov).size === 4) return ov;
-				  return top4Default;
-				}, [selectedTournament, top4Default]);
-
 
                 {/* Playoffs */}
                 <div style={S.panel}>
