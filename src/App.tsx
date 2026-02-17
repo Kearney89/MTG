@@ -120,21 +120,31 @@ function getLoserId(m: { a: ID; b: ID; winsA: number; winsB: number; done: boole
   if (!w) return null;
   return w === m.a ? m.b : m.a;
 }
-function ensureFinalHasCorrectPlayers(t: Tournament) {
+function ensureFinalHasCorrectPlayers(t: Tournament): Tournament {
   const sf1 = t.poMatches.find(m => m.phase === "SF1");
   const sf2 = t.poMatches.find(m => m.phase === "SF2");
   const fin = t.poMatches.find(m => m.phase === "F");
   if (!sf1 || !sf2 || !fin) return t;
 
-  const w1 = getWinnerId(sf1);
-  const w2 = getWinnerId(sf2);
+  const w1 = sf1.done ? (sf1.winsA > sf1.winsB ? sf1.a : sf1.b) : null;
+  const w2 = sf2.done ? (sf2.winsA > sf2.winsB ? sf2.a : sf2.b) : null;
+
+  // Se non abbiamo entrambi i finalisti, non tocchiamo la finale
   if (!w1 || !w2) return t;
 
-  if ((fin.a === w1 && fin.b === w2) || (fin.a === w2 && fin.b === w1)) return t;
+  // Se già corretta, non fare nulla
+  const already = fin.a === w1 && fin.b === w2;
+  if (already) return t;
 
-  const newFinal: POMatch = { ...fin, a: w1, b: w2, winsA: 0, winsB: 0, done: false };
-  return { ...t, poMatches: t.poMatches.map(m => (m.phase === "F" ? newFinal : m)) };
+  // ✅ aggiorna SOLO i player della finale, preservando score/done della finale
+  const updated = t.poMatches.map(m => {
+    if (m.phase !== "F") return m;
+    return { ...m, a: w1, b: w2 }; // non toccare winsA/winsB/done
+  });
+
+  return { ...t, poMatches: updated };
 }
+
 function computeTournamentWinner(t: Tournament) {
   const fin = t.poMatches.find(m => m.phase === "F");
   const w = fin ? getWinnerId(fin) : null;
@@ -205,6 +215,69 @@ export default function App() {
     reader.readAsText(file);
   }
 
+function buildWhatsAppText(players: Player[], t: Tournament) {
+  const name = (id: ID) => getPlayerName(players, id);
+
+  const lines: string[] = [];
+  lines.push(t.name);
+  lines.push("");
+
+  // Matches girone (mostra vuoto se non giocato, parziale se a+b<2)
+  for (const m of t.rrMatches) {
+    const a = name(m.a);
+    const b = name(m.b);
+
+    let score = "";
+    const total = m.winsA + m.winsB;
+
+    if (total === 0) score = "";
+    else if (total < 2) score = `${m.winsA} a ${m.winsB} (parziale)`;
+    else score = `${m.winsA} a ${m.winsB}`;
+
+    lines.push(`${a} - ${b}: ${score}`);
+  }
+
+  lines.push("");
+  lines.push("*Classifica:*");
+
+  // classifica (punti/diff già calcolati)
+  const standings = calcRRStandings(players, t);
+  for (const s of standings) {
+    lines.push(`${s.name} ${s.pts}`);
+  }
+
+  lines.push("");
+  lines.push("*Semifinali:*");
+
+  // Se playoff già generati: mostra
+  if (t.stage !== "roundrobin" && t.poMatches.length) {
+    const sf1 = t.poMatches.find(x => x.phase === "SF1");
+    const sf2 = t.poMatches.find(x => x.phase === "SF2");
+
+    if (sf1) lines.push(`${name(sf1.a)} - ${name(sf1.b)}: ${sf1.done ? `${sf1.winsA} a ${sf1.winsB}` : ""}`);
+    if (sf2) lines.push(`${name(sf2.a)} - ${name(sf2.b)}: ${sf2.done ? `${sf2.winsA} a ${sf2.winsB}` : ""}`);
+  } else {
+    lines.push("");
+  }
+
+  lines.push("");
+  lines.push("*Finale:*");
+
+  const fin = t.poMatches.find(x => x.phase === "F");
+  if (fin && t.stage !== "roundrobin") {
+    lines.push(`${name(fin.a)} - ${name(fin.b)}: ${fin.done ? `${fin.winsA} a ${fin.winsB}` : ""}`);
+  } else {
+    lines.push("");
+  }
+
+  lines.push("");
+  lines.push("*Vincitore:*");
+  lines.push(t.winnerId ? `🏆 ${name(t.winnerId)}` : "🏆");
+
+  return lines.join("\n");
+}
+
+
   // ---- Players
   const [newPlayerName, setNewPlayerName] = useState("");
   function addPlayer(name: string) {
@@ -266,16 +339,24 @@ export default function App() {
   }
 
   // ---- RR results (girone sempre 2 game)
-  function setRRResult(matchId: ID, winsA: number, winsB: number) {
-    if (!selectedTournament) return;
-    const a = clamp(winsA, 0, 2);
-    const b = clamp(winsB, 0, 2);
-    if (a + b !== 2) return;
+function setRRResult(matchId: ID, winsA: number, winsB: number) {
+  if (!selectedTournament) return;
 
-    updateTournament(selectedTournament.id, {
-      rrMatches: selectedTournament.rrMatches.map(m => (m.id === matchId ? { ...m, winsA: a, winsB: b, done: true } : m)),
-    });
-  }
+  const a = clamp(winsA, 0, 2);
+  const b = clamp(winsB, 0, 2);
+
+  // ✅ Girone: massimo 2 game totali, ma può essere 1 (parziale)
+  if (a + b > 2) return;
+
+  const done = (a + b === 2); // ✅ chiuso solo quando avete giocato 2 game
+
+  updateTournament(selectedTournament.id, {
+    rrMatches: selectedTournament.rrMatches.map(m =>
+      m.id === matchId ? { ...m, winsA: a, winsB: b, done } : m
+    ),
+  });
+}
+
   function unsetRR(matchId: ID) {
     if (!selectedTournament) return;
     updateTournament(selectedTournament.id, {
@@ -307,8 +388,8 @@ export default function App() {
 
     const a = clamp(winsA, 0, 2);
     const b = clamp(winsB, 0, 2);
-    if (a === 2 && b === 2) return;
-    const done = a === 2 || b === 2;
+	// ✅ Bo3 finisce quando uno arriva a 2
+	const done = (a === 2 || b === 2);
 
     let next: Tournament = {
       ...selectedTournament,
@@ -351,6 +432,8 @@ export default function App() {
     if (result === "0-2") setRRResult(nextPending.id, 0, 2);
     setTimeout(() => quickRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   }
+
+
 
   // ---- Hall of Fame (always on top)
   const hall = useMemo(() => {
@@ -559,6 +642,7 @@ container: {
 
 };
 
+
 const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
 
   return (
@@ -738,7 +822,20 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                   <input type="checkbox" checked={quickMode} onChange={() => setQuickMode(v => !v)} />
                   Quick Entry
                 </label>
-              </div>
+              
+			  
+<button
+  style={S.btn}
+  onClick={async () => {
+    if (!selectedTournament) return;
+    const text = buildWhatsAppText(state.players, selectedTournament);
+    await navigator.clipboard.writeText(text);
+    alert("Copiato! Incolla su WhatsApp ✅");
+  }}
+>
+  Copia WhatsApp
+</button>
+			  </div>
 
               {/* Participants */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
@@ -939,7 +1036,9 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
 
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
                             <span style={{ opacity: 0.8, fontSize: 12 }}>Bo3:</span>
-                            <button style={S.btn} onClick={() => setPOWins(m.id, 2, 0)}>2-0</button>
+                            <button style={S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
+							<button style={S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
+							<button style={S.btn} onClick={() => setPOWins(m.id, 2, 0)}>2-0</button>
                             <button style={S.btn} onClick={() => setPOWins(m.id, 2, 1)}>2-1</button>
                             <button style={S.btn} onClick={() => setPOWins(m.id, 1, 2)}>1-2</button>
                             <button style={S.btn} onClick={() => setPOWins(m.id, 0, 2)}>0-2</button>
@@ -971,12 +1070,18 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                       </div>
 
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                        <button style={S.btn} onClick={() => setRRResult(m.id, 2, 0)}>2-0</button>
+                        <button style={S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
+						<button style={S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
+						<button style={S.btn} onClick={() => setRRResult(m.id, 2, 0)}>2-0</button>
                         <button style={S.btn} onClick={() => setRRResult(m.id, 1, 1)}>1-1</button>
                         <button style={S.btn} onClick={() => setRRResult(m.id, 0, 2)}>0-2</button>
 
                         <span style={{ marginLeft: "auto", fontWeight: 900 }}>
-                          {m.done ? `${m.winsA}-${m.winsB} ✅` : "—"}
+                          {(m.winsA + m.winsB) === 0
+							? "—"
+							: m.done
+							  ? `${m.winsA}-${m.winsB} ✅`
+							  : `${m.winsA}-${m.winsB} 🕗`}
                         </span>
 
                         {m.done && (
