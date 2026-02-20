@@ -193,15 +193,30 @@ export default function App() {
   );
 
   // ---- Export/Import
-  function exportJSON() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `mtg-tournaments-backup-${formatDateISO()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+function exportJSON() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // nome suggerito (puoi personalizzarlo)
+  const defaultName = `MTG-backup-${today}.json`;
+
+  let fileName = prompt("Nome file JSON:", defaultName);
+  if (!fileName) return;
+
+  if (!fileName.toLowerCase().endsWith(".json")) {
+    fileName += ".json";
   }
+
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
   function importJSON(file: File) {
     const reader = new FileReader();
     reader.onload = () => {
