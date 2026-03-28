@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { supabase } from "./lib/supabase";
+
 type ID = string;
 
 type Player = { id: ID; name: string; active: boolean };
@@ -160,7 +162,8 @@ function trophyForRank(rank: number) {
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => {
-    const raw = localStorage.getItem(LS_KEY);
+
+	const raw = localStorage.getItem(LS_KEY);
     if (!raw) {
       const initialPlayers: Player[] = [
         { id: uid("p"), name: "Antonio", active: true },
@@ -170,7 +173,8 @@ export default function App() {
         { id: uid("p"), name: "Claudio", active: true },
         { id: uid("p"), name: "Lorenzo", active: true },
       ].sort(byName);
-      return { players: initialPlayers, tournaments: [] };
+
+	  return { players: initialPlayers, tournaments: [] };
     }
     try {
       return JSON.parse(raw) as AppState;
@@ -181,9 +185,57 @@ export default function App() {
 
   const [selectedTournamentId, setSelectedTournamentId] = useState<ID | null>(null);
 
+    const [adminPassword, setAdminPassword] = useState(
+  localStorage.getItem("mtg_admin_password") || ""
+);
+
+function rememberPassword(value: string) {
+  setAdminPassword(value);
+  localStorage.setItem("mtg_admin_password", value);
+}
+
+      async function loadSharedState() {
+  const { data, error } = await supabase
+    .from("league_state")
+    .select("data")
+    .eq("id", "main")
+    .single();
+
+  if (error) {
+    console.error("Errore loadSharedState:", error.message);
+    alert("Errore caricamento cloud");
+    return;
+  }
+
+  if (data?.data) {
+    setState(data.data as AppState);
+    localStorage.setItem(LS_KEY, JSON.stringify(data.data));
+  }
+}
+
+async function saveSharedState(password: string) {
+  const res = await fetch("/api/save-state", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, state }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(json?.error || "Errore salvataggio cloud");
+  }
+}
+
+useEffect(() => {
+  loadSharedState();
+}, []);
+
   useEffect(() => {
     localStorage.setItem(LS_KEY, JSON.stringify(state));
   }, [state]);
+
+
 
   const playersSorted = useMemo(() => [...state.players].sort(byName), [state.players]);
 
@@ -687,6 +739,34 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
           </label>
         </div>
       </div>
+
+<div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+  <input
+    style={{ ...S.input, width: 180 }}
+    type="password"
+    value={adminPassword}
+    onChange={(e) => rememberPassword(e.target.value)}
+    placeholder="Password admin"
+  />
+
+  <button style={S.btn} onClick={loadSharedState}>
+    Carica cloud
+  </button>
+
+  <button
+    style={S.btnPrimary}
+    onClick={async () => {
+      try {
+        await saveSharedState(adminPassword);
+        alert("Salvato nel cloud ✅");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Errore cloud");
+      }
+    }}
+  >
+    Salva cloud
+  </button>
+</div>
 
       {/* HALL OF FAME (always on top) */}
       <div style={{ ...S.card, marginBottom: 12 }}>
