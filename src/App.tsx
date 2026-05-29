@@ -626,6 +626,24 @@ const S = {
     fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
   } as React.CSSProperties,
 
+mobileStack: {
+  display: "grid",
+  gridTemplateColumns: "1fr",
+  gap: 12,
+} as React.CSSProperties,
+
+mobileButtons: {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+} as React.CSSProperties,
+
+mobileButtonFull: {
+  width: "100%",
+  minHeight: 44,
+  fontSize: 15,
+} as React.CSSProperties,
+
   topbar: {
     display: "flex",
     gap: 10,
@@ -774,9 +792,15 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
   {cloudLoaded ? "☁️ Cloud collegato" : "☁️ Caricamento cloud..."}
 </div>
 
-<div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+<div
+  style={
+    isNarrow
+      ? { display: "grid", gridTemplateColumns: "1fr", gap: 8, marginBottom: 12 }
+      : { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }
+  }
+>
   <input
-    style={{ ...S.input, width: 180 }}
+    style={{ ...S.input, width: isNarrow ? "100%" : 180 }}
     type="password"
     value={adminPassword}
     onChange={(e) => rememberPassword(e.target.value)}
@@ -816,7 +840,7 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
           <div style={S.subtle}>sx: classifica per nome · dx: tornei conclusi con vincitore</div>
         </div>
 
-        <div style={{ ...S.grid2, marginTop: 10 }}>
+        <div style={isNarrow ? { ...S.mobileStack, marginTop: 10 } : { ...S.grid2, marginTop: 10 }}>
           {/* Left: standings by name + cups left */}
           <div style={S.panel}>
           <div
@@ -886,13 +910,7 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
       </div>
 
       {/* MAIN: Active tournaments left + selected tournament right */}
-	  <div
-	  style={
-		isNarrow
-		  ? { display: "grid", gridTemplateColumns: "1fr", gap: 12 }
-		  : S.gridMain
-	  }
-	  >
+	  <div style={isNarrow ? S.mobileStack : S.gridMain}>
 
         {/* LEFT: active tournaments */}
         <div style={S.card}>
@@ -1007,10 +1025,10 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                         <div style={{ fontWeight: 900, fontSize: 18, textAlign: "right" }}>{getPlayerName(state.players, nextPending.b)}</div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140 }} onClick={() => quickSet("2-0")}>2–0</button>
-                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140 }} onClick={() => quickSet("1-1")}>1–1</button>
-                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140 }} onClick={() => quickSet("0-2")}>0–2</button>
+                      <div style={isNarrow ? { ...S.mobileButtons, marginTop: 10 } : { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140, ...(isNarrow ? S.mobileButtonFull : {}) }} onClick={() => quickSet("2-0")}>2–0</button>
+                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140, ...(isNarrow ? S.mobileButtonFull : {}) }} onClick={() => quickSet("1-1")}>1–1</button>
+                        <button style={{ ...S.btnPrimary, flex: 1, minWidth: 140, ...(isNarrow ? S.mobileButtonFull : {}) }} onClick={() => quickSet("0-2")}>0–2</button>
                       </div>
                       <div style={{ marginTop: 8, opacity: 0.75, fontSize: 12 }}>Tap → salva → passa al match successivo.</div>
                     </>
@@ -1019,7 +1037,7 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
               )}
 
               {/* Standings + Playoffs */}
-              <div style={{ ...S.grid2, marginTop: 12 }}>
+              <div style={isNarrow ? { ...S.mobileStack, marginTop: 12 } : { ...S.grid2, marginTop: 12 }}>
                 {/* Standings */}
                 <div style={S.panel}>
                   <div style={S.panelHeader}>Classifica Girone</div>
@@ -1170,14 +1188,20 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                             <div style={{ fontWeight: 900, textAlign: "right" }}>{getPlayerName(state.players, m.b)}</div>
                           </div>
 
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+                          <div
+  style={
+    isNarrow
+      ? { ...S.mobileButtons, marginTop: 10 }
+      : { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }
+  }
+>
                             <span style={{ opacity: 0.8, fontSize: 12 }}>Bo3:</span>
-                            <button style={S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
-							<button style={S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
-							<button style={S.btn} onClick={() => setPOWins(m.id, 2, 0)}>2-0</button>
-                            <button style={S.btn} onClick={() => setPOWins(m.id, 2, 1)}>2-1</button>
-                            <button style={S.btn} onClick={() => setPOWins(m.id, 1, 2)}>1-2</button>
-                            <button style={S.btn} onClick={() => setPOWins(m.id, 0, 2)}>0-2</button>
+                            <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
+							<button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
+							<button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setPOWins(m.id, 2, 0)}>2-0</button>
+                            <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setPOWins(m.id, 2, 1)}>2-1</button>
+                            <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setPOWins(m.id, 1, 2)}>1-2</button>
+                            <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setPOWins(m.id, 0, 2)}>0-2</button>
                             <span style={{ marginLeft: "auto", fontWeight: 900 }}>{m.winsA}-{m.winsB} {m.done ? "✅" : ""}</span>
                           </div>
 
@@ -1205,12 +1229,18 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
                         <div style={{ fontWeight: 900, textAlign: "right" }}>{getPlayerName(state.players, m.b)}</div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
-                        <button style={S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
-						<button style={S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
-						<button style={S.btn} onClick={() => setRRResult(m.id, 2, 0)}>2-0</button>
-                        <button style={S.btn} onClick={() => setRRResult(m.id, 1, 1)}>1-1</button>
-                        <button style={S.btn} onClick={() => setRRResult(m.id, 0, 2)}>0-2</button>
+                      <div
+  style={
+    isNarrow
+      ? { ...S.mobileButtons, marginTop: 10 }
+      : { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }
+  }
+>
+                        <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 1, 0)}>1-0</button>
+						<button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 0, 1)}>0-1</button>
+						<button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 2, 0)}>2-0</button>
+                        <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 1, 1)}>1-1</button>
+                        <button style={isNarrow ? { ...S.btn, ...S.mobileButtonFull } : S.btn} onClick={() => setRRResult(m.id, 0, 2)}>0-2</button>
 
                         <span style={{ marginLeft: "auto", fontWeight: 900 }}>
                           {(m.winsA + m.winsB) === 0
@@ -1234,13 +1264,7 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
       </div>
 
       {/* BOTTOM: players left, new tournament right */}
-      <div
-        style={
-          isNarrow
-            ? { display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 }
-            : S.gridBottom
-        }
-      >
+      <div style={isNarrow ? { ...S.mobileStack, marginTop: 12 } : S.gridBottom}>
 
         {/* Players */}
         <div style={S.card}>
