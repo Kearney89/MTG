@@ -233,8 +233,10 @@ async function saveSharedState(password: string) {
 }
 
 useEffect(() => {
-  loadSharedState(false);
-}, []);
+  if (adminPassword) {
+    loadSharedState(false);
+  }
+}, [adminPassword]);
 
 useEffect(() => {
   localStorage.setItem(LS_KEY, JSON.stringify(state));
