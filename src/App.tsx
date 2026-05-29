@@ -30,6 +30,8 @@ type AppState = { players: Player[]; tournaments: Tournament[] };
 
 const LS_KEY = "mtg_draft_tracker_ui_v3";
 
+const [cloudLoaded, setCloudLoaded] = useState(false);
+
 function extractOrderNumber(name: string): number | null {
   const match = name.trim().match(/^(\d+)/);
   return match ? parseInt(match[1], 10) : null;
@@ -203,6 +205,12 @@ async function loadSharedState(showAlert = true) {
     .eq("id", "main")
     .single();
 
+if (data?.data) {
+  setState(data.data as AppState);
+  localStorage.setItem(LS_KEY, JSON.stringify(data.data));
+  setCloudLoaded(true);
+}
+
   if (error) {
     console.error("Errore loadSharedState:", error.message);
     setSyncMessage("Errore caricamento cloud");
@@ -241,7 +249,7 @@ useEffect(() => {
 useEffect(() => {
   localStorage.setItem(LS_KEY, JSON.stringify(state));
 
-  if (!adminPassword) return;
+  if (!adminPassword || !cloudLoaded) return;
 
   const timer = setTimeout(async () => {
     try {
@@ -761,6 +769,10 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
           </label>
         </div>
       </div>
+
+<div style={S.subtle}>
+  {cloudLoaded ? "☁️ Cloud collegato" : "☁️ Caricamento cloud..."}
+</div>
 
 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
   <input
