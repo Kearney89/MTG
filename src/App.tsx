@@ -30,7 +30,7 @@ type AppState = { players: Player[]; tournaments: Tournament[] };
 
 const LS_KEY = "mtg_draft_tracker_ui_v3";
 
-const [cloudLoaded, setCloudLoaded] = useState(false);
+
 
 function extractOrderNumber(name: string): number | null {
   const match = name.trim().match(/^(\d+)/);
@@ -186,6 +186,8 @@ export default function App() {
   });
 
   const [selectedTournamentId, setSelectedTournamentId] = useState<ID | null>(null);
+
+  const [cloudLoaded, setCloudLoaded] = useState(false);
 
     const [adminPassword, setAdminPassword] = useState(
   localStorage.getItem("mtg_admin_password") || ""
