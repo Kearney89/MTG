@@ -189,12 +189,14 @@ export default function App() {
   localStorage.getItem("mtg_admin_password") || ""
 );
 
+const [syncMessage, setSyncMessage] = useState("");
+
 function rememberPassword(value: string) {
   setAdminPassword(value);
   localStorage.setItem("mtg_admin_password", value);
 }
 
-      async function loadSharedState() {
+async function loadSharedState(showAlert = true) {
   const { data, error } = await supabase
     .from("league_state")
     .select("data")
@@ -203,13 +205,16 @@ function rememberPassword(value: string) {
 
   if (error) {
     console.error("Errore loadSharedState:", error.message);
-    alert("Errore caricamento cloud");
+    setSyncMessage("Errore caricamento cloud");
+    if (showAlert) alert("Errore caricamento cloud");
     return;
   }
 
   if (data?.data) {
     setState(data.data as AppState);
     localStorage.setItem(LS_KEY, JSON.stringify(data.data));
+    setSyncMessage("Cloud caricato ✅");
+    if (showAlert) alert("Cloud caricato ✅");
   }
 }
 
@@ -228,12 +233,27 @@ async function saveSharedState(password: string) {
 }
 
 useEffect(() => {
-  loadSharedState();
+  loadSharedState(false);
 }, []);
 
-  useEffect(() => {
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-  }, [state]);
+useEffect(() => {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+
+  if (!adminPassword) return;
+
+  const timer = setTimeout(async () => {
+    try {
+      setSyncMessage("Salvataggio cloud...");
+      await saveSharedState(adminPassword);
+      setSyncMessage("Cloud salvato ✅");
+    } catch (err) {
+      console.error("Autosave cloud error:", err);
+      setSyncMessage("Errore salvataggio cloud");
+    }
+  }, 1500);
+
+  return () => clearTimeout(timer);
+}, [state, adminPassword]);
 
 
 
@@ -749,9 +769,9 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
     placeholder="Password admin"
   />
 
-  <button style={S.btn} onClick={loadSharedState}>
-    Carica cloud
-  </button>
+  <button style={S.btn} onClick={() => loadSharedState(true)}>
+  Carica cloud
+</button>
 
   <button
     style={S.btnPrimary}
@@ -766,6 +786,13 @@ const isNarrow = typeof window !== "undefined" && window.innerWidth < 980;
   >
     Salva cloud
   </button>
+  
+  {syncMessage && (
+  <span style={{ ...S.chip, fontSize: 12 }}>
+    {syncMessage}
+  </span>
+)}
+  
 </div>
 
       {/* HALL OF FAME (always on top) */}
